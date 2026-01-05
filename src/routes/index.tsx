@@ -36,6 +36,7 @@ import {
   RolesManagement,
   OrganizationsManagement,
   CommonMasterExcel,
+  FeeCategoryExemptionsManagement,
 } from "@/pages";
 
 export const router = createBrowserRouter([
@@ -96,6 +97,7 @@ export const router = createBrowserRouter([
       { path: "master/roles", element: <RolesManagement /> },
       { path: "master/organizations", element: <OrganizationsManagement /> },
       { path: "master/common-excel", element: <CommonMasterExcel /> },
+      { path: "master/fee-category-exemptions", element: <FeeCategoryExemptionsManagement /> },
       { path: "*", element: <NotFound /> },
     ],
   },

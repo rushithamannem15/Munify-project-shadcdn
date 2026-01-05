@@ -32,5 +32,6 @@ export { default as DataTableReference } from "../features/admin/pages/DataTable
 export { default as RolesManagement } from "../features/master/pages/RolesManagement"
 export { default as OrganizationsManagement } from "../features/master/pages/OrganizationsManagement"
 export { default as CommonMasterExcel } from "../features/master/pages/CommonMasterExcel"
+export { default as FeeCategoryExemptionsManagement } from "../features/master/pages/FeeCategoryExemptionsManagement"
 export { default as InvitationsManagement } from "../features/users/pages/InvitationsManagement"
 
