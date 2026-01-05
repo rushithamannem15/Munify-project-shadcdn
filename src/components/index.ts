@@ -5,4 +5,6 @@ export * from "./nav-user"
 export * from "./search-form"
 export * from "./team-switcher"
 export * from "./Copyright"
+export { default as ProjectFiltersAdvanced } from "./ProjectFiltersAdvanced"
+export type { ProjectFiltersState } from "./ProjectFiltersAdvanced"
 

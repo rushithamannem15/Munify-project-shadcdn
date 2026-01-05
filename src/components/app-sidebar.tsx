@@ -1,5 +1,5 @@
 import * as React from "react"
-import { LayoutDashboard, FolderKanban, Building2, Settings, Wrench, GalleryVerticalEnd, Table, Shield } from "lucide-react"
+import { LayoutDashboard, FolderKanban, Building2, Settings, Wrench, GalleryVerticalEnd, Table, Shield, Handshake } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
 import { NavProjects } from "@/components/nav-projects"
@@ -64,6 +64,16 @@ const data = {
         { title: "Credit Ratings", url: "/main/municipal/ratings" },
         { title: "Financial Analysis", url: "/main/municipal/analysis" },
         { title: "Q&A Management", url: "/main/municipal/qa" },
+        { title: "Project Progress", url: "/main/municipal/projects/progress" },
+        { title: "Document Requests", url: "/main/municipal/document-requests" },
+      ],
+    },
+    {
+      title: "Lender",
+      url: "/main/lender",
+      icon: Handshake,
+      items: [
+        { title: "Requested Documents", url: "/main/lender/requested-documents" },
       ],
     },
     {

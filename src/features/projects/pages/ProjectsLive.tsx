@@ -6,10 +6,11 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
 import { useNavigate } from "react-router-dom"
 import { apiService } from "@/services/api"
 import { alerts } from "@/lib/alerts"
-import ProjectFilters, { type FilterState } from "@/components/ProjectFilters"
+import ProjectFiltersAdvanced, { type ProjectFiltersState } from "@/components/ProjectFiltersAdvanced"
 import { FundingCommitmentDialog } from "@/features/projects/components/FundingCommitmentDialog"
 import { type Project, LIVE_PROJECTS_QUERY_KEY } from "@/features/projects/types"
 import { 
@@ -22,7 +23,10 @@ import {
   Heart,
   IndianRupee,
   MessageCircle,
-  X
+  X,
+  ChevronDown,
+  ChevronUp,
+  FolderKanban
 } from "lucide-react"
 
 import { useAuth } from "@/contexts/auth-context"
@@ -51,23 +55,45 @@ export default function ProjectsLive() {
   const queryClient = useQueryClient()
   const { user } = useAuth()
   const [fundingDialog, setFundingDialog] = useState<{ open: boolean; project_reference_id: string | null }>({ open: false, project_reference_id: null })
+  const [showMoreFilters, setShowMoreFilters] = useState(false)
+  const [advancedFiltersOpen, setAdvancedFiltersOpen] = useState(false)
   
-  // Filter state
-  const [filters, setFilters] = useState<FilterState>({
-    search: "",
-    categories: [],
-    states: [],
-    status: [],
-    fundingRange: [0, 1000],
-    progressRange: [0, 100],
-    daysLeftRange: [0, 365],
-    interestRateRange: [0, 25]
+  // Filter state for UI (temporary changes before applying)
+  const [filters, setFilters] = useState<ProjectFiltersState>({
+    project_referenceid: "",
+    location: "",
+    project_category: "",
+    project_stage: "",
+    status: "",
+    credit_score: "",
+    funding_type: "",
+    mode_of_implementation: "",
+    ownership: "",
+    fund_requirement: [0, 1000],
+    commitment_gap: [0, 500],
+    project_cost: [0, 2000]
+  })
+
+  // Applied filters state (used for API calls)
+  const [appliedFilters, setAppliedFilters] = useState<ProjectFiltersState>({
+    project_referenceid: "",
+    location: "",
+    project_category: "",
+    project_stage: "",
+    status: "",
+    credit_score: "",
+    funding_type: "",
+    mode_of_implementation: "",
+    ownership: "",
+    fund_requirement: [0, 1000],
+    commitment_gap: [0, 500],
+    project_cost: [0, 2000]
   })
 
   // Debounced search
   const [searchTimeout, setSearchTimeout] = useState<NodeJS.Timeout | null>(null)
 
-  const buildProjectQueryParams = (currentFilters: FilterState) => {
+  const buildProjectQueryParams = (currentFilters: ProjectFiltersState, valueRanges: any) => {
     const queryParams: any = {
       skip: 0,
       limit: 10,
@@ -76,44 +102,150 @@ export default function ProjectsLive() {
       user_id: user?.data?.login,
     }
 
-    // Add search parameter
-    if (currentFilters.search) {
-      queryParams.search = currentFilters.search
+    // Add search parameter (project_referenceid)
+    if (currentFilters.project_referenceid) {
+      queryParams.search = currentFilters.project_referenceid
     }
 
-    // Add category filters
-    if (currentFilters.categories.length > 0) {
-      queryParams.categories = currentFilters.categories.join(",")
+    // Add location (state) filter
+    if (currentFilters.location) {
+      queryParams.states = currentFilters.location
     }
 
-    // Add state filters
-    if (currentFilters.states.length > 0) {
-      queryParams.states = currentFilters.states.join(",")
+    // Add project category filter
+    if (currentFilters.project_category) {
+      queryParams.categories = currentFilters.project_category
     }
 
-    // Add status filters (override default active if user selected)
-    if (currentFilters.status.length > 0) {
-      queryParams.status = currentFilters.status.map((s) => s.toLowerCase()).join(",")
+    // Add project stage filter
+    if (currentFilters.project_stage) {
+      queryParams.project_stage = currentFilters.project_stage
     }
 
-    // Advanced filters can be wired as backend supports them
-    if (currentFilters.fundingRange[0] > 0 || currentFilters.fundingRange[1] < 1000) {
-      queryParams.min_funding = currentFilters.fundingRange[0] * 10000000
-      queryParams.max_funding = currentFilters.fundingRange[1] * 10000000
+    // Add status filter (override default active if user selected)
+    if (currentFilters.status) {
+      queryParams.status = currentFilters.status.toLowerCase()
     }
 
-    if (currentFilters.progressRange[0] > 0 || currentFilters.progressRange[1] < 100) {
-      queryParams.min_progress = currentFilters.progressRange[0]
-      queryParams.max_progress = currentFilters.progressRange[1]
+    // Add credit score filter
+    if (currentFilters.credit_score) {
+      queryParams.municipality_credit_rating = currentFilters.credit_score
     }
 
-    if (currentFilters.daysLeftRange[0] > 0 || currentFilters.daysLeftRange[1] < 365) {
-      queryParams.min_days_left = currentFilters.daysLeftRange[0]
-      queryParams.max_days_left = currentFilters.daysLeftRange[1]
+    // Add funding type filter
+    if (currentFilters.funding_type) {
+      queryParams.funding_type = currentFilters.funding_type
+    }
+
+    // Add mode of implementation filter
+    if (currentFilters.mode_of_implementation) {
+      queryParams.mode_of_implementation = currentFilters.mode_of_implementation
+    }
+
+    // Add ownership filter
+    if (currentFilters.ownership) {
+      queryParams.ownership = currentFilters.ownership
+    }
+
+    // Add fund requirement range (convert crores to rupees: 1 crore = 10,000,000)
+    if (
+      currentFilters.fund_requirement[0] > valueRanges.fund_requirement.min ||
+      currentFilters.fund_requirement[1] < valueRanges.fund_requirement.max
+    ) {
+      queryParams.min_funding_requirement = currentFilters.fund_requirement[0] * 10000000
+      queryParams.max_funding_requirement = currentFilters.fund_requirement[1] * 10000000
+    }
+
+    // Add commitment gap range (convert crores to rupees)
+    if (
+      currentFilters.commitment_gap[0] > valueRanges.commitment_gap.min ||
+      currentFilters.commitment_gap[1] < valueRanges.commitment_gap.max
+    ) {
+      queryParams.min_commitment_gap = currentFilters.commitment_gap[0] * 10000000
+      queryParams.max_commitment_gap = currentFilters.commitment_gap[1] * 10000000
+    }
+
+    // Add project cost range (convert crores to rupees)
+    if (
+      currentFilters.project_cost[0] > valueRanges.project_cost.min ||
+      currentFilters.project_cost[1] < valueRanges.project_cost.max
+    ) {
+      queryParams.min_total_project_cost = currentFilters.project_cost[0] * 10000000
+      queryParams.max_total_project_cost = currentFilters.project_cost[1] * 10000000
     }
 
     return queryParams
   }
+
+  // Query for value ranges (min/max for sliders)
+  const { data: valueRangesResponse } = useQuery({
+    queryKey: ["project-value-ranges"],
+    queryFn: () => apiService.get("/projects/value-ranges"),
+    retry: false,
+  })
+
+  // Extract range values from API and convert to crores if needed
+  const valueRanges = useMemo(() => {
+    if (!valueRangesResponse) {
+      return {
+        fund_requirement: { min: 0, max: 1000 },
+        commitment_gap: { min: 0, max: 500 },
+        project_cost: { min: 0, max: 2000 },
+      }
+    }
+    const data = Array.isArray(valueRangesResponse)
+      ? valueRangesResponse[0]
+      : (valueRangesResponse as any)?.data || valueRangesResponse
+    
+    // Helper function to parse string/number and convert to crores (divide by 10,000,000)
+    const toCrores = (value: string | number | undefined, defaultValue: number = 0): number => {
+      if (value === undefined || value === null) return defaultValue
+      const numValue = typeof value === 'string' ? parseFloat(value) : value
+      if (isNaN(numValue)) return defaultValue
+      // Convert from rupees to crores (1 crore = 10,000,000)
+      return Math.round((numValue / 10000000) * 100) / 100 // Round to 2 decimal places
+    }
+
+    const fundReqMin = toCrores(
+      data?.min_funding_requirement || data?.fund_requirement_min || data?.min_fund_requirement,
+      0
+    )
+    const fundReqMax = toCrores(
+      data?.max_funding_requirement || data?.fund_requirement_max || data?.max_fund_requirement,
+      1000
+    )
+    const commitGapMin = toCrores(
+      data?.min_commitment_gap || data?.commitment_gap_min || data?.min_commitment_gap,
+      0
+    )
+    const commitGapMax = toCrores(
+      data?.max_commitment_gap || data?.commitment_gap_max || data?.max_commitment_gap,
+      500
+    )
+    const projCostMin = toCrores(
+      data?.min_total_project_cost || data?.project_cost_min || data?.min_project_cost,
+      0
+    )
+    const projCostMax = toCrores(
+      data?.max_total_project_cost || data?.project_cost_max || data?.max_project_cost,
+      2000
+    )
+
+    return {
+      fund_requirement: {
+        min: fundReqMin,
+        max: fundReqMax,
+      },
+      commitment_gap: {
+        min: commitGapMin,
+        max: commitGapMax,
+      },
+      project_cost: {
+        min: projCostMin,
+        max: projCostMax,
+      },
+    }
+  }, [valueRangesResponse])
 
   const {
     data: projectsResponse,
@@ -121,35 +253,78 @@ export default function ProjectsLive() {
     isError,
     error,
   } = useQuery<any, any>({
-    queryKey: [...LIVE_PROJECTS_QUERY_KEY, { filters }],
-    queryFn: () => apiService.get("/projects", buildProjectQueryParams(filters)),
+    queryKey: [...LIVE_PROJECTS_QUERY_KEY, { filters: appliedFilters }],
+    queryFn: () => apiService.get("/projects", buildProjectQueryParams(appliedFilters, valueRanges)),
   })
 
   const projects = useMemo<Project[]>(() => projectsResponse?.data ?? [], [projectsResponse])
 
-  // Count active filters for UI display (only advanced filters)
+  // Extract unique values from projects for dropdown options
+  const filterOptions = useMemo(() => {
+    const states = Array.from(new Set(projects.map(p => p.state).filter(Boolean))).sort()
+    const categories = Array.from(new Set(projects.map(p => p.category).filter(Boolean))).sort()
+    const stages = Array.from(new Set(projects.map(p => p.project_stage).filter(Boolean))).sort()
+    const statuses = Array.from(new Set(projects.map(p => p.status).filter(Boolean))).sort()
+    const creditScores = Array.from(new Set(projects.map(p => p.municipality_credit_rating).filter(Boolean))).sort()
+    const fundingTypes = Array.from(new Set(projects.map(p => (p as any).funding_type).filter(Boolean))).sort()
+    const modes = Array.from(new Set(projects.map(p => (p as any).mode_of_implementation).filter(Boolean))).sort()
+    const ownerships = Array.from(new Set(projects.map(p => (p as any).ownership).filter(Boolean))).sort()
+
+    return {
+      states: states.map(s => ({ value: s, label: s })),
+      categories: categories.map(c => ({ value: c, label: c })),
+      stages: stages.map(s => ({ value: s, label: s })),
+      statuses: statuses.map(s => ({ value: s, label: s })),
+      creditScores: creditScores.map(c => ({ value: c, label: c })),
+      fundingTypes: fundingTypes.map(f => ({ value: f, label: f })),
+      modes: modes.map(m => ({ value: m, label: m })),
+      ownerships: ownerships.map(o => ({ value: o, label: o })),
+    }
+  }, [projects])
+
+  // Count active filters for UI display (only range filters) - based on applied filters
   const activeFiltersCount = useMemo(() => {
     let count = 0
-    if (filters.fundingRange[0] > 0 || filters.fundingRange[1] < 1000) count++
-    if (filters.progressRange[0] > 0 || filters.progressRange[1] < 100) count++
-    if (filters.daysLeftRange[0] > 0 || filters.daysLeftRange[1] < 365) count++
+    const fundReqMin = valueRanges?.fund_requirement?.min ?? 0
+    const fundReqMax = valueRanges?.fund_requirement?.max ?? 1000
+    const commitGapMin = valueRanges?.commitment_gap?.min ?? 0
+    const commitGapMax = valueRanges?.commitment_gap?.max ?? 500
+    const projCostMin = valueRanges?.project_cost?.min ?? 0
+    const projCostMax = valueRanges?.project_cost?.max ?? 2000
+    
+    if (appliedFilters.fund_requirement[0] > fundReqMin || appliedFilters.fund_requirement[1] < fundReqMax) count++
+    if (appliedFilters.commitment_gap[0] > commitGapMin || appliedFilters.commitment_gap[1] < commitGapMax) count++
+    if (appliedFilters.project_cost[0] > projCostMin || appliedFilters.project_cost[1] < projCostMax) count++
     return count
-  }, [filters])
+  }, [appliedFilters, valueRanges])
 
-  // Count all active filters (including basic ones)
+  // Count all active filters (including basic ones) - based on applied filters
   const totalActiveFiltersCount = useMemo(() => {
     let count = 0
-    if (filters.search) count++
-    if (filters.categories.length > 0) count++
-    if (filters.states.length > 0) count++
-    if (filters.status.length > 0) count++
-    if (filters.fundingRange[0] > 0 || filters.fundingRange[1] < 1000) count++
-    if (filters.progressRange[0] > 0 || filters.progressRange[1] < 100) count++
-    if (filters.daysLeftRange[0] > 0 || filters.daysLeftRange[1] < 365) count++
+    if (appliedFilters.project_referenceid) count++
+    if (appliedFilters.location) count++
+    if (appliedFilters.project_category) count++
+    if (appliedFilters.project_stage) count++
+    if (appliedFilters.status) count++
+    if (appliedFilters.credit_score) count++
+    if (appliedFilters.funding_type) count++
+    if (appliedFilters.mode_of_implementation) count++
+    if (appliedFilters.ownership) count++
+    
+    const fundReqMin = valueRanges?.fund_requirement?.min ?? 0
+    const fundReqMax = valueRanges?.fund_requirement?.max ?? 1000
+    const commitGapMin = valueRanges?.commitment_gap?.min ?? 0
+    const commitGapMax = valueRanges?.commitment_gap?.max ?? 500
+    const projCostMin = valueRanges?.project_cost?.min ?? 0
+    const projCostMax = valueRanges?.project_cost?.max ?? 2000
+    
+    if (appliedFilters.fund_requirement[0] > fundReqMin || appliedFilters.fund_requirement[1] < fundReqMax) count++
+    if (appliedFilters.commitment_gap[0] > commitGapMin || appliedFilters.commitment_gap[1] < commitGapMax) count++
+    if (appliedFilters.project_cost[0] > projCostMin || appliedFilters.project_cost[1] < projCostMax) count++
     return count
-  }, [filters])
+  }, [appliedFilters, valueRanges])
 
-  const handleFiltersChange = (newFilters: FilterState) => {
+  const handleFiltersChange = (newFilters: ProjectFiltersState) => {
     setFilters(newFilters)
   }
 
@@ -159,25 +334,63 @@ export default function ProjectsLive() {
     }
 
     const timeout = setTimeout(() => {
-      setFilters((prev) => ({ ...prev, search: searchValue }))
+      setFilters((prev) => ({ ...prev, project_referenceid: searchValue }))
     }, 500) // 500ms delay
 
     setSearchTimeout(timeout)
   }, [searchTimeout])
 
   const handleClearFilters = () => {
-    const clearedFilters: FilterState = {
-      search: "",
-      categories: [],
-      states: [],
-      status: [],
-      fundingRange: [0, 1000] as [number, number],
-      progressRange: [0, 100] as [number, number],
-      daysLeftRange: [0, 365] as [number, number],
-      interestRateRange: [0, 25] as [number, number],
+    const clearedFilters: ProjectFiltersState = {
+      project_referenceid: "",
+      location: "",
+      project_category: "",
+      project_stage: "",
+      status: "",
+      credit_score: "",
+      funding_type: "",
+      mode_of_implementation: "",
+      ownership: "",
+      fund_requirement: [valueRanges?.fund_requirement?.min ?? 0, valueRanges?.fund_requirement?.max ?? 1000] as [number, number],
+      commitment_gap: [valueRanges?.commitment_gap?.min ?? 0, valueRanges?.commitment_gap?.max ?? 500] as [number, number],
+      project_cost: [valueRanges?.project_cost?.min ?? 0, valueRanges?.project_cost?.max ?? 2000] as [number, number],
     }
     setFilters(clearedFilters)
+    setAppliedFilters(clearedFilters)
   }
+
+  const handleApplyFilters = () => {
+    setAppliedFilters(filters)
+    setAdvancedFiltersOpen(false)
+  }
+
+  // Update filter ranges when valueRanges are loaded
+  useEffect(() => {
+    if (valueRanges && (valueRanges.fund_requirement.max > 0 || valueRanges.commitment_gap.max > 0 || valueRanges.project_cost.max > 0)) {
+      const updatedFilters = {
+        fund_requirement: [
+          valueRanges.fund_requirement.min,
+          valueRanges.fund_requirement.max
+        ] as [number, number],
+        commitment_gap: [
+          valueRanges.commitment_gap.min,
+          valueRanges.commitment_gap.max
+        ] as [number, number],
+        project_cost: [
+          valueRanges.project_cost.min,
+          valueRanges.project_cost.max
+        ] as [number, number],
+      }
+      setFilters(prev => ({
+        ...prev,
+        ...updatedFilters
+      }))
+      setAppliedFilters(prev => ({
+        ...prev,
+        ...updatedFilters
+      }))
+    }
+  }, [valueRanges])
 
   // Cleanup timeout on unmount
   useEffect(() => {
@@ -277,13 +490,83 @@ export default function ProjectsLive() {
           </p>
         </div>
         <div className="flex items-center space-x-2">
-          <ProjectFilters
-            filters={filters}
-            onFiltersChange={handleFiltersChange}
-            onClearFilters={handleClearFilters}
-            activeFiltersCount={activeFiltersCount}
-          />
-          <Button>
+          <Sheet open={advancedFiltersOpen} onOpenChange={setAdvancedFiltersOpen}>
+            <SheetTrigger asChild>
+              <Button variant="outline" className="relative">
+                <Filter className="h-4 w-4 mr-2" />
+                Advanced Filters
+                {activeFiltersCount > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-2 -right-2 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                  >
+                    {activeFiltersCount}
+                  </Badge>
+                )}
+              </Button>
+            </SheetTrigger>
+            <SheetContent className="w-[400px] sm:w-[540px] overflow-y-auto">
+              <SheetHeader>
+                <SheetTitle className="flex items-center gap-2">
+                  <Filter className="h-5 w-5" />
+                  Advanced Filters
+                </SheetTitle>
+                <SheetDescription>
+                  Fine-tune your search with advanced filtering options
+                </SheetDescription>
+              </SheetHeader>
+              <div className="mt-6">
+                <ProjectFiltersAdvanced
+                  filters={filters}
+                  onFiltersChange={handleFiltersChange}
+                  onClearFilters={handleClearFilters}
+                  locationOptions={filterOptions.states}
+                  categoryOptions={filterOptions.categories}
+                  stageOptions={filterOptions.stages}
+                  statusOptions={filterOptions.statuses}
+                  creditScoreOptions={filterOptions.creditScores}
+                  fundingTypeOptions={filterOptions.fundingTypes}
+                  modeOfImplementationOptions={filterOptions.modes}
+                  ownershipOptions={filterOptions.ownerships}
+                  fundRequirementRange={valueRanges?.fund_requirement}
+                  commitmentGapRange={valueRanges?.commitment_gap}
+                  projectCostRange={valueRanges?.project_cost}
+                  hideSearchField={true}
+                  hideCardWrapper={true}
+                  showOnlyRangeFilters={true}
+                />
+              </div>
+              <div className="flex flex-col gap-3 mt-8 pt-6 border-t">
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    onClick={handleClearFilters}
+                    className="flex-1"
+                    disabled={totalActiveFiltersCount === 0}
+                  >
+                    <X className="h-4 w-4 mr-2" />
+                    Clear All
+                  </Button>
+                  <Button 
+                    onClick={handleApplyFilters}
+                    className="flex-1"
+                  >
+                    Apply Filters
+                  </Button>
+                </div>
+                {totalActiveFiltersCount > 0 && (
+                  <div className="text-sm text-muted-foreground text-center">
+                    {totalActiveFiltersCount} filter{totalActiveFiltersCount !== 1 ? 's' : ''} active
+                  </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
+          <Button variant="outline" onClick={() => navigate("/main/projects/my")}>
+            <FolderKanban className="h-4 w-4 mr-2" />
+            My Projects
+          </Button>
+          <Button onClick={() => navigate("/main/projects/favorites")}>
             <Star className="h-4 w-4 mr-2" />
             My Favorites
           </Button>
@@ -300,22 +583,25 @@ export default function ProjectsLive() {
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input 
-                    placeholder="Search projects, municipalities, or categories..." 
+                    placeholder="Search by project reference ID..." 
                     className="pl-10"
-                    value={filters.search}
+                    value={filters.project_referenceid}
                     onChange={(e) => {
                       const newSearch = e.target.value
-                      setFilters(prev => ({ ...prev, search: newSearch }))
+                      setFilters(prev => ({ ...prev, project_referenceid: newSearch }))
+                      // Update applied filters immediately for search (no need to wait for Apply button)
+                      setAppliedFilters(prev => ({ ...prev, project_referenceid: newSearch }))
                       debouncedSearch(newSearch)
                     }}
                   />
-                  {filters.search && (
+                  {filters.project_referenceid && (
                     <Button
                       variant="ghost"
                       size="sm"
                       className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
                       onClick={() => {
-                        setFilters(prev => ({ ...prev, search: "" }))
+                        setFilters(prev => ({ ...prev, project_referenceid: "" }))
+                      setAppliedFilters(prev => ({ ...prev, project_referenceid: "" }))
                       }}
                     >
                       <X className="h-3 w-3" />
@@ -341,97 +627,251 @@ export default function ProjectsLive() {
               )}
             </div>
 
-            {/* Basic Filters - Single Line */}
-            <div className="flex flex-wrap items-center gap-3">
+            {/* Selection Filters */}
+            <div className="space-y-3">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Filter className="h-4 w-4" />
                 <span>Filters:</span>
               </div>
               
-              <Select 
-                value={filters.categories.length > 0 ? filters.categories[0] : "all"} 
-                onValueChange={(value) => {
-                  const newCategories = value === "all" ? [] : [value]
-                  const newFilters = { ...filters, categories: newCategories }
-                  setFilters(newFilters)
-                }}
-              >
-                <SelectTrigger className="w-[180px] h-9">
-                  <SelectValue placeholder="All Categories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  <SelectItem value="infrastructure">🏗️ Infrastructure</SelectItem>
-                  <SelectItem value="renewable">⚡ Renewable Energy</SelectItem>
-                  <SelectItem value="environment">🌱 Environment</SelectItem>
-                  <SelectItem value="transport">🚌 Transport</SelectItem>
-                  <SelectItem value="healthcare">🏥 Healthcare</SelectItem>
-                  <SelectItem value="education">🎓 Education</SelectItem>
-                  <SelectItem value="water">💧 Water & Sanitation</SelectItem>
-                  <SelectItem value="waste">♻️ Waste Management</SelectItem>
-                </SelectContent>
-              </Select>
+              {/* Primary Filters Row - First line with 5 filters + Show More button */}
+              <div className="flex items-center gap-3 flex-wrap">
+                {/* Location (State) */}
+                {filterOptions.states.length > 0 && (
+                  <Select 
+                    value={appliedFilters.location || "all"} 
+                    onValueChange={(value) => {
+                      const newValue = value === "all" ? "" : value
+                      setFilters(prev => ({ ...prev, location: newValue }))
+                      setAppliedFilters(prev => ({ ...prev, location: newValue }))
+                    }}
+                  >
+                    <SelectTrigger className="w-[180px] h-9">
+                      <SelectValue placeholder="All States" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All States</SelectItem>
+                      {filterOptions.states.map((state) => (
+                        <SelectItem key={state.value} value={state.value}>
+                          {state.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
 
-              <Select 
-                value={filters.states.length > 0 ? filters.states[0] : "all"} 
-                onValueChange={(value) => {
-                  const newStates = value === "all" ? [] : [value]
-                  const newFilters = { ...filters, states: newStates }
-                  setFilters(newFilters)
-                }}
-              >
-                <SelectTrigger className="w-[160px] h-9">
-                  <SelectValue placeholder="All States" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All States</SelectItem>
-                  <SelectItem value="maharashtra">Maharashtra</SelectItem>
-                  <SelectItem value="delhi">Delhi</SelectItem>
-                  <SelectItem value="karnataka">Karnataka</SelectItem>
-                  <SelectItem value="tamil-nadu">Tamil Nadu</SelectItem>
-                  <SelectItem value="gujarat">Gujarat</SelectItem>
-                  <SelectItem value="rajasthan">Rajasthan</SelectItem>
-                  <SelectItem value="west-bengal">West Bengal</SelectItem>
-                  <SelectItem value="uttar-pradesh">Uttar Pradesh</SelectItem>
-                </SelectContent>
-              </Select>
+                {/* Project Category */}
+                {filterOptions.categories.length > 0 && (
+                  <Select 
+                    value={appliedFilters.project_category || "all"} 
+                    onValueChange={(value) => {
+                      const newValue = value === "all" ? "" : value
+                      setFilters(prev => ({ ...prev, project_category: newValue }))
+                      setAppliedFilters(prev => ({ ...prev, project_category: newValue }))
+                    }}
+                  >
+                    <SelectTrigger className="w-[180px] h-9">
+                      <SelectValue placeholder="All Categories" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Categories</SelectItem>
+                      {filterOptions.categories.map((category) => (
+                        <SelectItem key={category.value} value={category.value}>
+                          {category.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
 
-              <Select 
-                value={filters.status.length > 0 ? filters.status[0] : "all"} 
-                onValueChange={(value) => {
-                  const newStatus = value === "all" ? [] : [value]
-                  const newFilters = { ...filters, status: newStatus }
-                  setFilters(newFilters)
-                }}
-              >
-                <SelectTrigger className="w-[150px] h-9">
-                  <SelectValue placeholder="All Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="ACTIVE">🟢 Active</SelectItem>
-                  <SelectItem value="FUNDING">🔵 Seeking Funding</SelectItem>
-                  <SelectItem value="COMPLETED">⚫ Completed</SelectItem>
-                  <SelectItem value="CANCELLED">🔴 Cancelled</SelectItem>
-                </SelectContent>
-              </Select>
+                {/* Project Stage */}
+                {filterOptions.stages.length > 0 && (
+                  <Select 
+                    value={appliedFilters.project_stage || "all"} 
+                    onValueChange={(value) => {
+                      const newValue = value === "all" ? "" : value
+                      setFilters(prev => ({ ...prev, project_stage: newValue }))
+                      setAppliedFilters(prev => ({ ...prev, project_stage: newValue }))
+                    }}
+                  >
+                    <SelectTrigger className="w-[180px] h-9">
+                      <SelectValue placeholder="All Stages" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Stages</SelectItem>
+                      {filterOptions.stages.map((stage) => (
+                        <SelectItem key={stage.value} value={stage.value}>
+                          {stage.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {/* Credit Score */}
+                {filterOptions.creditScores.length > 0 && (
+                  <Select 
+                    value={appliedFilters.credit_score || "all"} 
+                    onValueChange={(value) => {
+                      const newValue = value === "all" ? "" : value
+                      setFilters(prev => ({ ...prev, credit_score: newValue }))
+                      setAppliedFilters(prev => ({ ...prev, credit_score: newValue }))
+                    }}
+                  >
+                    <SelectTrigger className="w-[180px] h-9">
+                      <SelectValue placeholder="All Credit Scores" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Credit Scores</SelectItem>
+                      {filterOptions.creditScores.map((score) => (
+                        <SelectItem key={score.value} value={score.value}>
+                          {score.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {/* Funding Type */}
+                {filterOptions.fundingTypes.length > 0 && (
+                  <Select 
+                    value={appliedFilters.funding_type || "all"} 
+                    onValueChange={(value) => {
+                      const newValue = value === "all" ? "" : value
+                      setFilters(prev => ({ ...prev, funding_type: newValue }))
+                      setAppliedFilters(prev => ({ ...prev, funding_type: newValue }))
+                    }}
+                  >
+                    <SelectTrigger className="w-[180px] h-9">
+                      <SelectValue placeholder="All Funding Types" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All Funding Types</SelectItem>
+                      {filterOptions.fundingTypes.map((type) => (
+                        <SelectItem key={type.value} value={type.value}>
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                {/* Show More Button - Show when there are additional filters */}
+                {(filterOptions.modes.length > 0 || filterOptions.ownerships.length > 0) && (
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowMoreFilters(!showMoreFilters)}
+                    className="h-9 px-3 text-sm font-normal text-muted-foreground hover:text-foreground hover:bg-accent/50 shrink-0 border border-transparent hover:border-border transition-all"
+                  >
+                    <span className="flex items-center gap-1.5">
+                      {showMoreFilters ? (
+                        <>
+                          <ChevronUp className="h-3.5 w-3.5" />
+                          <span>Show Less</span>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown className="h-3.5 w-3.5" />
+                          <span>Show More</span>
+                        </>
+                      )}
+                    </span>
+                  </Button>
+                )}
+              </div>
+
+              {/* Secondary Filters Row (shown when showMoreFilters is true) */}
+              {showMoreFilters && (
+                <div className="flex flex-wrap items-center gap-3 pt-2 border-t">
+
+                  {/* Mode of Implementation */}
+                  {filterOptions.modes.length > 0 && (
+                    <Select 
+                      value={appliedFilters.mode_of_implementation || "all"} 
+                      onValueChange={(value) => {
+                        const newValue = value === "all" ? "" : value
+                        setFilters(prev => ({ ...prev, mode_of_implementation: newValue }))
+                        setAppliedFilters(prev => ({ ...prev, mode_of_implementation: newValue }))
+                      }}
+                    >
+                      <SelectTrigger className="w-[200px] h-9">
+                        <SelectValue placeholder="All Modes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Modes</SelectItem>
+                        {filterOptions.modes.map((mode) => (
+                          <SelectItem key={mode.value} value={mode.value}>
+                            {mode.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+
+                  {/* Ownership */}
+                  {filterOptions.ownerships.length > 0 && (
+                    <Select 
+                      value={appliedFilters.ownership || "all"} 
+                      onValueChange={(value) => {
+                        const newValue = value === "all" ? "" : value
+                        setFilters(prev => ({ ...prev, ownership: newValue }))
+                        setAppliedFilters(prev => ({ ...prev, ownership: newValue }))
+                      }}
+                    >
+                      <SelectTrigger className="w-[180px] h-9">
+                        <SelectValue placeholder="All Ownership" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Ownership</SelectItem>
+                        {filterOptions.ownerships.map((ownership) => (
+                          <SelectItem key={ownership.value} value={ownership.value}>
+                            {ownership.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              )}
 
               {/* Active Filter Indicators */}
-              {(filters.categories.length > 0 || filters.states.length > 0 || filters.status.length > 0) && (
-                <div className="flex items-center gap-1">
-                  {filters.categories.length > 0 && (
+              {(appliedFilters.location || appliedFilters.project_category || 
+                appliedFilters.project_stage || appliedFilters.credit_score || appliedFilters.funding_type || 
+                appliedFilters.mode_of_implementation || appliedFilters.ownership) && (
+                <div className="flex items-center gap-1 flex-wrap">
+                  {appliedFilters.location && (
                     <Badge variant="secondary" className="text-xs">
-                      {filters.categories[0]}
+                      {filterOptions.states.find(s => s.value === appliedFilters.location)?.label || appliedFilters.location}
                     </Badge>
                   )}
-                  {filters.states.length > 0 && (
+                  {appliedFilters.project_category && (
                     <Badge variant="secondary" className="text-xs">
-                      {filters.states[0]}
+                      {filterOptions.categories.find(c => c.value === appliedFilters.project_category)?.label || appliedFilters.project_category}
                     </Badge>
                   )}
-                  {filters.status.length > 0 && (
+                  {appliedFilters.project_stage && (
                     <Badge variant="secondary" className="text-xs">
-                      {filters.status[0]}
+                      {filterOptions.stages.find(s => s.value === appliedFilters.project_stage)?.label || appliedFilters.project_stage}
+                    </Badge>
+                  )}
+                  {appliedFilters.credit_score && (
+                    <Badge variant="secondary" className="text-xs">
+                      Credit: {filterOptions.creditScores.find(c => c.value === appliedFilters.credit_score)?.label || appliedFilters.credit_score}
+                    </Badge>
+                  )}
+                  {appliedFilters.funding_type && (
+                    <Badge variant="secondary" className="text-xs">
+                      {filterOptions.fundingTypes.find(f => f.value === appliedFilters.funding_type)?.label || appliedFilters.funding_type}
+                    </Badge>
+                  )}
+                  {appliedFilters.mode_of_implementation && (
+                    <Badge variant="secondary" className="text-xs">
+                      {filterOptions.modes.find(m => m.value === appliedFilters.mode_of_implementation)?.label || appliedFilters.mode_of_implementation}
+                    </Badge>
+                  )}
+                  {appliedFilters.ownership && (
+                    <Badge variant="secondary" className="text-xs">
+                      {filterOptions.ownerships.find(o => o.value === appliedFilters.ownership)?.label || appliedFilters.ownership}
                     </Badge>
                   )}
                 </div>

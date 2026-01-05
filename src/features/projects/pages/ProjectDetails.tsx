@@ -57,6 +57,7 @@ import {
 } from "lucide-react"
 import { useAuth } from "@/contexts/auth-context"
 import { FundingCommitmentDialog } from "@/features/projects/components/FundingCommitmentDialog"
+import { RequestDocumentDialog } from "@/features/projects/components/RequestDocumentDialog"
 
 interface QuestionAnswer {
   id: number
@@ -210,6 +211,7 @@ export default function ProjectDetails() {
   const [noteTitle, setNoteTitle] = useState("")
   const [noteContent, setNoteContent] = useState("")
   const [fundingDialogOpen, setFundingDialogOpen] = useState(false)
+  const [requestDocumentDialogOpen, setRequestDocumentDialogOpen] = useState(false)
 
   // Fetch project data with documents
   const { data, isLoading, error, isError } = useQuery<ProjectApiResponse>({
@@ -630,6 +632,16 @@ export default function ProjectDetails() {
     if (id) {
       queryClient.invalidateQueries({ queryKey: ['project', id] })
     }
+  }
+
+  const handleOpenRequestDocumentDialog = () => {
+    if (projectReferenceId) {
+      setRequestDocumentDialogOpen(true)
+    }
+  }
+
+  const handleCloseRequestDocumentDialog = () => {
+    setRequestDocumentDialogOpen(false)
   }
 
   const createNoteMutation = useMutation({
@@ -1504,7 +1516,12 @@ export default function ProjectDetails() {
               </div>
               <Separator />
               <div className="space-y-2">
-                <Button variant="outline" className="w-full justify-start">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={handleOpenRequestDocumentDialog}
+                  disabled={!projectReferenceId}
+                >
                   <FileText className="h-4 w-4 mr-2" />
                   Request Documents
                 </Button>
@@ -1801,6 +1818,13 @@ export default function ProjectDetails() {
         open={fundingDialogOpen}
         project_reference_id={projectReferenceId || null}
         onClose={handleCloseFundingDialog}
+      />
+
+      {/* Request Document Dialog */}
+      <RequestDocumentDialog
+        open={requestDocumentDialogOpen}
+        project_reference_id={projectReferenceId || null}
+        onClose={handleCloseRequestDocumentDialog}
       />
     </div>
   )
