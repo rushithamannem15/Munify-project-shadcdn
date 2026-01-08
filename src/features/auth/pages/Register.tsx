@@ -6,7 +6,7 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
  
-import { Mail, Lock, Eye, EyeOff, User, UserCircle, Phone, Shield, Check, ChevronDown } from "lucide-react"
+import { Mail, Lock, Eye, EyeOff, User, UserCircle, Phone, Shield, Check, ChevronDown, CheckCircle2, MessageSquare } from "lucide-react"
 import MunifyLogo from "@/assets/MunifyLOGO.png"
 import { useState, useEffect } from "react"
 import { Link, useNavigate } from "react-router-dom"
@@ -59,6 +59,11 @@ export default function Register() {
   const [open, setOpen] = useState(false)
   const [orgNameOpen, setOrgNameOpen] = useState(false)
   const [orgTypeOpen, setOrgTypeOpen] = useState(false)
+  
+  // OTP verification state
+  const [otp, setOtp] = useState("")
+  const [isMobileVerified, setIsMobileVerified] = useState(false)
+  const [isVerifyingOtp, setIsVerifyingOtp] = useState(false)
 
   // Infer a coarse organization type label from a branch/type name
   const inferOrgType = (label: string): string => {
@@ -192,6 +197,12 @@ export default function Register() {
     }
   }, [organizationTypes, organizations, orgFields.organizationType, orgFields.organizationTypeId, orgFields.organizationId])
 
+  // Reset OTP verification when mobile number changes
+  useEffect(() => {
+    setIsMobileVerified(false)
+    setOtp("")
+  }, [form.mobileNumber])
+
   // Prefill via invitation token with request cancellation
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -224,6 +235,9 @@ export default function Register() {
             organizationName: (data?.organization_name || "").toString(),
             organizationType: (data?.organization_type || "").toString(),
           }))
+          // Reset OTP verification state when prefilling
+          setIsMobileVerified(false)
+          setOtp("")
           // If backend didn't send readable type, the effect above will infer once organizations load
         }
       } catch (err: any) {
@@ -244,16 +258,38 @@ export default function Register() {
     }
   }, [])
 
+  const handleVerifyOtp = async () => {
+    if (!otp.trim()) {
+      alerts.error("Validation Error", "Please enter OTP")
+      return
+    }
+    if (otp.length !== 6) {
+      alerts.error("Validation Error", "OTP must be 6 digits")
+      return
+    }
+    
+    setIsVerifyingOtp(true)
+    
+    // Simulate OTP verification (backend not ready)
+    // In production, this would call: await apiService.post("/auth/verify-otp", { mobileNumber: form.mobileNumber, otp })
+    setTimeout(() => {
+      setIsMobileVerified(true)
+      setIsVerifyingOtp(false)
+      alerts.success("Success", "Mobile number verified successfully")
+    }, 500)
+  }
+
   const validate = () => {
     if (!form.userName.trim()) return "Full name is required"
     if (!form.login.trim()) return "User ID is required"
     if (!form.email.trim()) return "Email is required"
     if (!form.mobileNumber.trim()) return "Mobile number is required"
+    if (form.mobileNumber && isNaN(Number(form.mobileNumber))) return "Mobile number must be a valid number"
+    if (form.mobileNumber && form.mobileNumber.length !== 10) return "Mobile number must be 10 digits"
+    if (!isMobileVerified) return "Please verify your mobile number with OTP"
     if (!form.roleId) return "User role is required"
     if (!form.password) return "Password is required"
     if (form.password !== form.confirmPassword) return "Passwords do not match"
-    if (form.mobileNumber && isNaN(Number(form.mobileNumber))) return "Mobile number must be a valid number"
-    if (form.mobileNumber && form.mobileNumber.length !== 10) return "Mobile number must be 10 digits"
     // Password policy: 8-15 chars, at least 1 uppercase, 1 digit, 1 special
     const pwd = form.password
     if (pwd.length < 8 || pwd.length > 15) return "Password must be 8-15 characters"
@@ -588,6 +624,69 @@ export default function Register() {
                   </div>
                 </div>
 
+                {/* OTP Verification - Full width */}
+                <div className="md:col-span-2 space-y-1.5">
+                  <Label htmlFor="otp">Verify Mobile Number</Label>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative flex-1">
+                      <MessageSquare className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 h-4 w-4" />
+                      <Input
+                        id="otp"
+                        type="text"
+                        placeholder="Enter 6-digit OTP"
+                        className={cn(
+                          "pl-10 pr-10",
+                          isMobileVerified && "border-green-500 bg-green-50"
+                        )}
+                        value={otp}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/\D/g, "").slice(0, 6)
+                          setOtp(value)
+                          // Reset verification if OTP changes after being verified
+                          if (isMobileVerified) {
+                            setIsMobileVerified(false)
+                          }
+                        }}
+                        maxLength={6}
+                        disabled={isMobileVerified || isVerifyingOtp || submitting}
+                      />
+                      {isMobileVerified && (
+                        <CheckCircle2 className="absolute right-3 top-1/2 -translate-y-1/2 text-green-600 h-4 w-4" />
+                      )}
+                    </div>
+                    <Button
+                      type="button"
+                      variant={isMobileVerified ? "outline" : "default"}
+                      onClick={handleVerifyOtp}
+                      disabled={isMobileVerified || isVerifyingOtp || submitting || !otp.trim() || otp.length !== 6}
+                      className="sm:w-auto w-full"
+                    >
+                      {isVerifyingOtp ? (
+                        <span className="inline-flex items-center gap-2">
+                          <Spinner size={16} /> Verifying...
+                        </span>
+                      ) : isMobileVerified ? (
+                        <span className="inline-flex items-center gap-2">
+                          <CheckCircle2 className="h-4 w-4" /> Verified
+                        </span>
+                      ) : (
+                        "Verify OTP"
+                      )}
+                    </Button>
+                  </div>
+                  {isMobileVerified && (
+                    <p className="text-xs text-green-600 flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Mobile number verified successfully
+                    </p>
+                  )}
+                  {!isMobileVerified && form.mobileNumber && form.mobileNumber.length === 10 && (
+                    <p className="text-xs text-muted-foreground">
+                      Please enter the OTP sent to your mobile number to verify
+                    </p>
+                  )}
+                </div>
+
                 {/* User Role */}
                 <div className="space-y-1.5">
                   <Label htmlFor="roleId">User Role</Label>
@@ -732,7 +831,7 @@ export default function Register() {
                   type="submit" 
                   size="lg"
                   className="md:w-auto w-full"
-                  disabled={!agreeToTerms || submitting}
+                  disabled={!agreeToTerms || submitting || !isMobileVerified}
                 >
                   {submitting ? (
                     <span className="inline-flex items-center gap-2"><Spinner size={16} /> Creating...</span>

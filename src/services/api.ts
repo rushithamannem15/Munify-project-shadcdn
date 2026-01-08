@@ -49,6 +49,10 @@ const requestInterceptor = (config: any) => {
     if (organizationId) {
       config.headers['organization_id'] = String(organizationId)
     }
+    const org_type=user.data.org_type
+    if (org_type) {
+      config.headers['org_type'] = String(org_type)
+    }
   }
   
   return config

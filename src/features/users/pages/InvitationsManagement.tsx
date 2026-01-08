@@ -143,9 +143,9 @@ export default function InvitationsManagement() {
       },
       {
         accessorKey: "isUsed",
-        header: "Used",
+        header: "Registered",
         cell: ({ row }) => (
-          <Badge variant={row.original.isUsed ? "secondary" : "outline"}>{row.original.isUsed ? "Yes" : "No"}</Badge>
+          <Badge variant={row.original.isUsed ? "secondary" : "outline"}>{row.original.isUsed ? "Registered" : "Not Registered"}</Badge>
         ),
       },
       {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query"
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"
 import { DataTable, type ColumnDef } from "@/components/data-table/data-table"
@@ -18,10 +18,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { MessageCircle, CheckCircle, Clock, ArrowUpDown, MessageSquare, MoreHorizontal, Edit, Trash2 } from "lucide-react"
-import apiService from "@/services/api"
+import { MessageCircle, CheckCircle, Clock, ArrowUpDown, MessageSquare, MoreHorizontal, Edit, Trash2, File, Download, X } from "lucide-react"
+import apiService, { api } from "@/services/api"
 import { alerts } from "@/lib/alerts"
 import { useAuth } from "@/contexts/auth-context"
+import { Spinner } from "@/components/ui/spinner"
 
 // UI Question interface
 interface Question {
@@ -39,6 +40,7 @@ interface Question {
   status: 'open' | 'answered'
 }
 
+
 export default function QAManagement() {
   const { user, isLoading: isAuthLoading } = useAuth()
   const queryClient = useQueryClient()
@@ -49,7 +51,8 @@ export default function QAManagement() {
   const [isEditMode, setIsEditMode] = useState(false)
   const [answeringQuestion, setAnsweringQuestion] = useState<Question | null>(null)
   const [answerText, setAnswerText] = useState("")
-  const [answerDocumentLinks, setAnswerDocumentLinks] = useState("")
+  const [answerFiles, setAnswerFiles] = useState<File[]>([])
+  const [existingDocuments, setExistingDocuments] = useState<any[]>([])
   
   // Delete confirmation dialog state
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
@@ -159,9 +162,39 @@ export default function QAManagement() {
     )
   }
 
+  // Fetch question details when editing
+  const { data: questionDetails, isLoading: isLoadingQuestionDetails } = useQuery({
+    queryKey: ['question-details', answeringQuestion?.id, answeringQuestion?.projectReferenceId],
+    queryFn: async () => {
+      if (!answeringQuestion?.id || !answeringQuestion?.projectReferenceId) return null
+      try {
+        const response = await apiService.get(`/questions/${answeringQuestion.id}`, {
+          project_id: answeringQuestion.projectReferenceId
+        })
+        return response?.data || response
+      } catch (err: any) {
+        console.error('Error fetching question details:', err)
+        return null
+      }
+    },
+    enabled: isEditMode && !!answeringQuestion?.id && !!answeringQuestion?.projectReferenceId,
+  })
+
+  // Update existing documents when question details are loaded
+  useEffect(() => {
+    // Handle API response structure: response.data.data.answer.documents
+    const answerData = questionDetails?.data?.answer || questionDetails?.answer
+    if (answerData?.documents && Array.isArray(answerData.documents) && answerData.documents.length > 0) {
+      setExistingDocuments(answerData.documents)
+    } else {
+      setExistingDocuments([])
+    }
+  }, [questionDetails])
+
   const resetAnswerForm = () => {
     setAnswerText("")
-    setAnswerDocumentLinks("")
+    setAnswerFiles([])
+    setExistingDocuments([])
     setAnsweringQuestion(null)
     setIsEditMode(false)
   }
@@ -169,7 +202,8 @@ export default function QAManagement() {
   const openAnswerDialog = (question: Question) => {
     setAnsweringQuestion(question)
     setAnswerText("")
-    setAnswerDocumentLinks("")
+    setAnswerFiles([])
+    setExistingDocuments([])
     setIsEditMode(false)
     setIsAnswerDialogOpen(true)
   }
@@ -177,14 +211,65 @@ export default function QAManagement() {
   const openEditDialog = (question: Question) => {
     setAnsweringQuestion(question)
     setAnswerText(question.answer || "")
-    setAnswerDocumentLinks(question.documentLinks || "")
+    setAnswerFiles([])
     setIsEditMode(true)
     setIsAnswerDialogOpen(true)
+    // Documents will be loaded via the query when dialog opens
   }
 
   const openDeleteDialog = (question: Question) => {
     setDeletingQuestion(question)
     setIsDeleteDialogOpen(true)
+  }
+
+  // Helper function to format file size
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes'
+    const k = 1024
+    const sizes = ['Bytes', 'KB', 'MB', 'GB']
+    const i = Math.floor(Math.log(bytes) / Math.log(k))
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
+  }
+
+  // Handle file download
+  const handleDownloadFile = async (fileId: number, filename: string) => {
+    try {
+      const response = await api.get(`/files/${fileId}/download`, {
+        responseType: 'blob'
+      })
+
+      const url = window.URL.createObjectURL(new Blob([response.data]))
+      const link = document.createElement('a')
+      link.href = url
+      link.setAttribute('download', filename)
+      document.body.appendChild(link)
+      link.click()
+      link.remove()
+      window.URL.revokeObjectURL(url)
+
+      alerts.success('Success', 'File downloaded successfully')
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.message || err?.message || 'Failed to download file. Please try again.'
+      alerts.error('Error', errorMessage)
+      console.error('Error downloading file:', err)
+    }
+  }
+
+  // Handle file selection
+  const handleFileChange = (files: FileList | null) => {
+    if (!files) return
+    const newFiles = Array.from(files)
+    setAnswerFiles(prev => [...prev, ...newFiles])
+  }
+
+  // Remove file from upload list
+  const removeFile = (index: number) => {
+    setAnswerFiles(prev => prev.filter((_, i) => i !== index))
+  }
+
+  // Remove existing document from the list
+  const removeExistingDocument = (docId: number) => {
+    setExistingDocuments(prev => prev.filter(doc => doc.id !== docId))
   }
 
   // Mutation for answering/editing questions
@@ -197,11 +282,20 @@ export default function QAManagement() {
         throw new Error("Answer text is required")
       }
 
-      const payload = {
-        reply_text: answerText.trim(),
-        attachments: [],
-        document_links: answerDocumentLinks.trim() || undefined,
+      const formData = new FormData()
+      formData.append('reply_text', answerText.trim())
+      
+      // Always send files as a list/array:
+      // - Single file: files: [file1.pdf] (as a list)
+      // - Multiple files: files: [file1.pdf, file2.jpg] (as a list)
+      // - No files: omit the field (backend handles empty array)
+      // FormData automatically creates an array when multiple values are appended with the same key
+      if (answerFiles.length > 0) {
+        answerFiles.forEach((file) => {
+          formData.append('files', file)
+        })
       }
+      // If no files, we omit the 'files' field entirely
 
       const endpoint = `/questions/${answeringQuestion.id}/answer?project_id=${encodeURIComponent(
         answeringQuestion.projectId
@@ -209,9 +303,9 @@ export default function QAManagement() {
 
       // Use PUT for edit, POST for new answer
       if (isEditMode) {
-        return await apiService.put(endpoint, payload)
+        return await apiService.put(endpoint, formData)
       }
-      return await apiService.post(endpoint, payload)
+      return await apiService.post(endpoint, formData)
     },
     onSuccess: () => {
       alerts.success(isEditMode ? "Answer Updated" : "Answer Saved", 
@@ -219,6 +313,9 @@ export default function QAManagement() {
       resetAnswerForm()
       setIsAnswerDialogOpen(false)
       queryClient.invalidateQueries({ queryKey: ['questions', { organization_id: ORGANIZATION_ID }] })
+      if (answeringQuestion?.id) {
+        queryClient.invalidateQueries({ queryKey: ['question-details', answeringQuestion.id] })
+      }
     },
     onError: (error: any) => {
       const message =
@@ -671,7 +768,7 @@ export default function QAManagement() {
           setIsAnswerDialogOpen(open)
         }}
       >
-        <DialogContent className="sm:max-w-[500px]">
+        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{isEditMode ? "Edit Answer" : "Answer Question"}</DialogTitle>
             <DialogDescription>
@@ -695,17 +792,120 @@ export default function QAManagement() {
                 onChange={(e) => setAnswerText(e.target.value)}
                 placeholder="Enter your answer for this question"
                 rows={4}
+                disabled={answerQuestionMutation.isPending || (isEditMode && isLoadingQuestionDetails)}
               />
             </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="answer-doc-links">Document links (optional)</Label>
-              <Input
-                id="answer-doc-links"
-                value={answerDocumentLinks}
-                onChange={(e) => setAnswerDocumentLinks(e.target.value)}
-                placeholder="https://example.com/document.pdf"
-              />
-            </div>
+
+            {/* Existing Documents Section (Edit Mode Only) */}
+            {isEditMode && (
+              <div className="space-y-2 pt-2 border-t">
+                <Label>Existing Documents</Label>
+                {isLoadingQuestionDetails ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Spinner size={16} />
+                    Loading documents...
+                  </div>
+                ) : existingDocuments.length > 0 ? (
+                  <div className="space-y-2">
+                    {existingDocuments.map((doc) => (
+                      <div
+                        key={doc.id}
+                        className="flex items-center justify-between p-2 bg-green-50 dark:bg-green-950/20 rounded-md border border-green-200 dark:border-green-800"
+                      >
+                        <div className="flex items-center space-x-2 flex-1 min-w-0">
+                          <File className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">
+                              {doc.file?.original_filename || 'Unknown file'}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {doc.file?.file_size ? formatFileSize(doc.file.file_size) : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center space-x-1 ml-2">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleDownloadFile(doc.file?.id, doc.file?.original_filename || 'file')}
+                            className="flex-shrink-0"
+                            title="Download file"
+                          >
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeExistingDocument(doc.id)}
+                            disabled={answerQuestionMutation.isPending}
+                            className="flex-shrink-0 text-destructive hover:text-destructive"
+                            title="Delete document"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-muted-foreground">No documents attached</p>
+                )}
+              </div>
+            )}
+
+            {/* File Upload Section - Only show if no existing documents (for edit mode) or always for answer mode */}
+            {(!isEditMode || existingDocuments.length === 0) && (
+              <div className="space-y-2 pt-2 border-t">
+                <Label htmlFor="answer-files">Documents (optional)</Label>
+                <Input
+                  id="answer-files"
+                  type="file"
+                  multiple
+                  onChange={(e) => {
+                    handleFileChange(e.target.files)
+                    e.target.value = '' // Reset input to allow selecting same file again
+                  }}
+                  disabled={answerQuestionMutation.isPending || (isEditMode && isLoadingQuestionDetails)}
+                />
+                <p className="text-xs text-muted-foreground">
+                  You can upload multiple documents. Click "Choose File" again to add more.
+                </p>
+
+                {/* Files to Upload List */}
+                {answerFiles.length > 0 && (
+                  <div className="space-y-2 mt-2">
+                    {answerFiles.map((file, index) => (
+                      <div
+                        key={`${file.name}-${index}`}
+                        className="flex items-center justify-between p-2 bg-muted rounded-md"
+                      >
+                        <div className="flex items-center space-x-2 flex-1 min-w-0">
+                          <File className="h-4 w-4 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{file.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatFileSize(file.size)}
+                            </p>
+                          </div>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeFile(index)}
+                          disabled={answerQuestionMutation.isPending}
+                          className="flex-shrink-0"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
           <DialogFooter>
             <Button
@@ -714,12 +914,13 @@ export default function QAManagement() {
                 resetAnswerForm()
                 setIsAnswerDialogOpen(false)
               }}
+              disabled={answerQuestionMutation.isPending}
             >
               Cancel
             </Button>
             <Button
               onClick={() => answerQuestionMutation.mutate()}
-              disabled={answerQuestionMutation.isPending}
+              disabled={answerQuestionMutation.isPending || (isEditMode && isLoadingQuestionDetails)}
             >
               {answerQuestionMutation.isPending 
                 ? (isEditMode ? "Updating..." : "Saving...") 

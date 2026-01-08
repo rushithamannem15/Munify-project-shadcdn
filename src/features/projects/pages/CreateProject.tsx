@@ -1467,7 +1467,7 @@ export default function CreateProject() {
     }
     // Validate organization type
     const orgType = user?.data?.org_type
-    if (!orgType || (orgType !== 'Municipality' && orgType !== 'Admin')) {
+    if (!orgType || (orgType !== 'Municipality' && orgType !== 'Munify')) {
       alerts.error('Invalid Organization Type', 'Only Municipality or Admin organizations can create projects.')
       return
     }
@@ -1514,7 +1514,7 @@ export default function CreateProject() {
 
     // Validate organization type
     const orgType = user?.data?.org_type
-    if (!orgType || (orgType !== 'Municipality' && orgType !== 'Admin')) {
+    if (!orgType || (orgType !== 'Municipality' && orgType !== 'Munify')) {
       alerts.error('Invalid Organization Type', 'Only Municipality or Admin organizations can create projects.')
       return
     }

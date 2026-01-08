@@ -58,6 +58,35 @@ import {
 import { useAuth } from "@/contexts/auth-context"
 import { FundingCommitmentDialog } from "@/features/projects/components/FundingCommitmentDialog"
 import { RequestDocumentDialog } from "@/features/projects/components/RequestDocumentDialog"
+import { RequestMeetingDialog } from "@/features/projects/components/RequestMeetingDialog"
+
+interface AnswerDocument {
+  id: number
+  question_reply_id: number
+  file_id: number
+  uploaded_by: string
+  file: {
+    id: number
+    organization_id: string
+    uploaded_by: string
+    filename: string
+    original_filename: string
+    mime_type: string
+    file_size: number
+    storage_path: string
+    checksum: string
+    access_level: string
+    download_count: number
+    is_deleted: boolean
+    deleted_at: string | null
+    created_at: string
+    created_by: string
+    updated_at: string
+    updated_by: string
+  }
+  created_at: string
+  updated_at: string
+}
 
 interface QuestionAnswer {
   id: number
@@ -75,6 +104,7 @@ interface QuestionAnswer {
     reply_text?: string
     replied_by_user_id?: string | number
     document_links?: string | null
+    documents?: AnswerDocument[]
     created_at?: string
   } | null
   // Fallback flat fields (defensive)
@@ -212,6 +242,7 @@ export default function ProjectDetails() {
   const [noteContent, setNoteContent] = useState("")
   const [fundingDialogOpen, setFundingDialogOpen] = useState(false)
   const [requestDocumentDialogOpen, setRequestDocumentDialogOpen] = useState(false)
+  const [requestMeetingDialogOpen, setRequestMeetingDialogOpen] = useState(false)
 
   // Fetch project data with documents
   const { data, isLoading, error, isError } = useQuery<ProjectApiResponse>({
@@ -286,6 +317,7 @@ export default function ProjectDetails() {
         reply_text: qa.reply_text,
         replied_by_user_id: qa.replied_by_user_id,
         document_links: qa.document_links,
+        documents: qa.answer?.documents,
         created_at: qa.answer?.created_at,
       }
     }
@@ -642,6 +674,16 @@ export default function ProjectDetails() {
 
   const handleCloseRequestDocumentDialog = () => {
     setRequestDocumentDialogOpen(false)
+  }
+
+  const handleOpenRequestMeetingDialog = () => {
+    if (projectReferenceId) {
+      setRequestMeetingDialogOpen(true)
+    }
+  }
+
+  const handleCloseRequestMeetingDialog = () => {
+    setRequestMeetingDialogOpen(false)
   }
 
   const createNoteMutation = useMutation({
@@ -1448,6 +1490,47 @@ export default function ProjectDetails() {
                                             {answer.document_links}
                                           </div>
                                         )}
+                                        {answer?.documents && answer.documents.length > 0 && (
+                                          <div className="mt-3 space-y-2">
+                                            <div className="text-xs font-medium text-muted-foreground mb-1">
+                                              Attached Documents:
+                                            </div>
+                                            {answer.documents.map((doc) => (
+                                              <div
+                                                key={doc.id}
+                                                className="flex items-center justify-between p-2 bg-background border rounded-lg hover:bg-muted/50 transition-colors"
+                                              >
+                                                <div className="flex items-center space-x-2 flex-1 min-w-0">
+                                                  <div className="p-1.5 bg-blue-100 dark:bg-blue-900/30 rounded flex-shrink-0">
+                                                    <FileText className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                                                  </div>
+                                                  <div className="flex-1 min-w-0">
+                                                    <div className="text-xs font-medium truncate">
+                                                      {doc.file.original_filename || doc.file.filename}
+                                                    </div>
+                                                    <div className="text-xs text-muted-foreground">
+                                                      {formatFileSize(doc.file.file_size)}
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                                <Button
+                                                  variant="outline"
+                                                  size="sm"
+                                                  className="ml-2 flex-shrink-0 h-7 px-2"
+                                                  onClick={() =>
+                                                    handleDownloadFile(
+                                                      doc.file.id,
+                                                      doc.file.original_filename || doc.file.filename
+                                                    )
+                                                  }
+                                                >
+                                                  <Download className="h-3 w-3 mr-1" />
+                                                  <span className="text-xs">Download</span>
+                                                </Button>
+                                              </div>
+                                            ))}
+                                          </div>
+                                        )}
                                       </div>
                                     </div>
                                   </div>
@@ -1525,7 +1608,12 @@ export default function ProjectDetails() {
                   <FileText className="h-4 w-4 mr-2" />
                   Request Documents
                 </Button>
-                <Button variant="outline" className="w-full justify-start">
+                <Button 
+                  variant="outline" 
+                  className="w-full justify-start"
+                  onClick={handleOpenRequestMeetingDialog}
+                  disabled={!projectReferenceId}
+                >
                   <MessageCircle className="h-4 w-4 mr-2" />
                   Schedule Meeting
                 </Button>
@@ -1825,6 +1913,13 @@ export default function ProjectDetails() {
         open={requestDocumentDialogOpen}
         project_reference_id={projectReferenceId || null}
         onClose={handleCloseRequestDocumentDialog}
+      />
+
+      {/* Request Meeting Dialog */}
+      <RequestMeetingDialog
+        open={requestMeetingDialogOpen}
+        project_reference_id={projectReferenceId || null}
+        onClose={handleCloseRequestMeetingDialog}
       />
     </div>
   )
