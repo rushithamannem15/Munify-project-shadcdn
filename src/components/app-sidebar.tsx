@@ -1,5 +1,5 @@
 import * as React from "react"
-import { LayoutDashboard, FolderKanban, Building2, Settings, Wrench, GalleryVerticalEnd, Table, Shield, Handshake } from "lucide-react"
+import { LayoutDashboard, FolderKanban, Building2, Settings, Wrench, GalleryVerticalEnd, Table, Shield, Handshake, Activity } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
 import { NavProjects } from "@/components/nav-projects"
@@ -41,6 +41,8 @@ const data = {
       icon: LayoutDashboard,
       items: [
         { title: "Overview", url: "/main" },
+        { title: "Municipality Dashboard", url: "/main/dashboard/municipality" },
+        { title: "Master Dashboard", url: "/main/admin/monitoring" },
       ],
     },
     {
@@ -100,8 +102,20 @@ const data = {
         { title: "Invitations Management", url: "/main/admin/invitations" },
         { title: "Send Invitation", url: "/main/admin/invitation" },
         { title: "Notifications", url: "/main/admin/notifications" },
-        { title: "Commitments", url: "/main/admin/commitments" },
+        { title: "Commitments Overview", url: "/main/admin/commitments" },
         { title: "Reports", url: "/main/admin/reports" },
+      ],
+    },
+    {
+      title: "Trackings",
+      url: "/main/admin/monitoring/lifecycle",
+      icon: Activity,
+      items: [
+        { title: "Project Lifecycle Tracker", url: "/main/admin/monitoring/lifecycle" },
+        { title: "Commitment Monitoring", url: "/main/admin/monitoring/commitments" },
+        { title: "Q&A & Communication", url: "/main/admin/monitoring/qa" },
+        { title: "Document Requests & Library", url: "/main/admin/monitoring/documents" },
+        { title: "Allocation & Disbursement", url: "/main/admin/monitoring/allocation-disbursement" },
       ],
     },
     {

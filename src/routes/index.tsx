@@ -26,6 +26,12 @@ import {
   AdminReports,
   AdminCommitments,
   AdminCommitmentDetails,
+  AdminMasterMonitoringDashboard,
+  ProjectLifecycleTracker,
+  CommitmentMonitoringDashboard,
+  QACommunicationTracker,
+  DocumentRequestResponseTracker,
+  AllocationDisbursementTracker,
   AdminInvitation,
   InvitationsManagement,
   Settings,
@@ -42,6 +48,7 @@ import {
   OrganizationsManagement,
   CommonMasterExcel,
   FeeCategoryExemptionsManagement,
+  MunicipalityDashboard,
 } from "@/pages";
 
 export const router = createBrowserRouter([
@@ -66,6 +73,7 @@ export const router = createBrowserRouter([
     element: <AppLayout />,
     children: [
       { index: true, element: <Dashboard /> },
+      { path: "dashboard/municipality", element: <MunicipalityDashboard /> },
       { path: "projects", element: <Projects /> },
       { path: "projects/live", element: <ProjectsLive /> },
       { path: "projects/funded", element: <ProjectsFunded /> },
@@ -99,6 +107,12 @@ export const router = createBrowserRouter([
       { path: "admin/reports", element: <AdminReports /> },
       { path: "admin/commitments", element: <AdminCommitments /> },
       { path: "admin/commitments/:projectReferenceId", element: <AdminCommitmentDetails /> },
+      { path: "admin/monitoring", element: <AdminMasterMonitoringDashboard /> },
+      { path: "admin/monitoring/lifecycle", element: <ProjectLifecycleTracker /> },
+      { path: "admin/monitoring/commitments", element: <CommitmentMonitoringDashboard /> },
+      { path: "admin/monitoring/qa", element: <QACommunicationTracker /> },
+      { path: "admin/monitoring/documents", element: <DocumentRequestResponseTracker /> },
+      { path: "admin/monitoring/allocation-disbursement", element: <AllocationDisbursementTracker /> },
       // Settings page now reads user details from auth session (useAuth), so no route param is needed
       { path: "settings", element: <Settings /> },
       { path: "demo", element: <Projects /> },
