@@ -1,4 +1,5 @@
 export { default as Dashboard } from "../features/dashboard/pages/Dashboard"
+export { default as LenderDashboard } from "../features/dashboard/pages/LenderDashboard"
 export { default as Projects } from "../features/projects/pages/Projects"
 export { default as ProjectsActive } from "../features/projects/pages/ProjectsActive"
 export { default as ProjectsLive } from "../features/projects/pages/ProjectsLive"
@@ -39,4 +40,10 @@ export { default as OrganizationsManagement } from "../features/master/pages/Org
 export { default as CommonMasterExcel } from "../features/master/pages/CommonMasterExcel"
 export { default as FeeCategoryExemptionsManagement } from "../features/master/pages/FeeCategoryExemptionsManagement"
 export { default as InvitationsManagement } from "../features/users/pages/InvitationsManagement"
+export { default as LenderReport } from "../features/reports/pages/LenderReport"
+export { default as ProjectLevelCommitmentReport } from "../features/reports/pages/ProjectLevelCommitmentReport"
+export { default as ProjectSuccessReport } from "../features/reports/pages/ProjectSuccessReport"
+export { default as CurrentStatusReport } from "../features/reports/pages/CurrentStatusReport"
+export { default as ProjectLevelCommitmentReportAdmin } from "../features/reports/pages/ProjectLevelCommitmentReportAdmin"
+export { default as ProjectSuccessReportAdmin } from "../features/reports/pages/ProjectSuccessReportAdmin"
 

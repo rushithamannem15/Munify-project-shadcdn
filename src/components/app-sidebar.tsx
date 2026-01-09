@@ -1,5 +1,5 @@
 import * as React from "react"
-import { LayoutDashboard, FolderKanban, Building2, Settings, Wrench, GalleryVerticalEnd, Table, Shield, Handshake } from "lucide-react"
+import { LayoutDashboard, FolderKanban, Building2, Settings, Wrench, GalleryVerticalEnd, Table, Shield, Handshake, FileText } from "lucide-react"
 
 import { NavMain } from "@/components/nav-main"
 import { NavProjects } from "@/components/nav-projects"
@@ -41,6 +41,7 @@ const data = {
       icon: LayoutDashboard,
       items: [
         { title: "Overview", url: "/main" },
+        { title: "Lender Dashboard", url: "/main/lender/dashboard" },
       ],
     },
     {
@@ -65,7 +66,7 @@ const data = {
         { title: "Financial Analysis", url: "/main/municipal/analysis" },
         { title: "Q&A Management", url: "/main/municipal/qa" },
         { title: "Project Progress", url: "/main/municipal/projects/progress" },
-        { title: "Document Requests", url: "/main/municipal/document-requests" },
+        { title: "Documents and Meetings", url: "/main/municipal/document-requests" },
       ],
     },
     {
@@ -73,7 +74,20 @@ const data = {
       url: "/main/lender",
       icon: Handshake,
       items: [
-        { title: "Requested Documents", url: "/main/lender/requested-documents" },
+        { title: "Request Documents and Meetings", url: "/main/lender/requested-documents" },
+      ],
+    },
+    {
+      title: "Reports",
+      url: "/main/reports",
+      icon: FileText,
+      items: [
+        { title: "Lender Report", url: "/main/reports/lender-report" },
+        { title: "Project-level Commitment Report", url: "/main/reports/project-level-commitment" },
+        { title: "Project Success Report", url: "/main/reports/project-success" },
+        { title: "Current Status Report", url: "/main/reports/current-status" },
+        { title: "Project-level Commitment Report (Admin)", url: "/main/reports/project-level-commitment-admin" },
+        { title: "Project Success Report (Admin)", url: "/main/reports/project-success-admin" },
       ],
     },
     {
