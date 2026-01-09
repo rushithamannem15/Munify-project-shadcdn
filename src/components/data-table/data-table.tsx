@@ -62,6 +62,13 @@ export type DataTableProps<TData, TValue> = {
     onTableReady?: (table: TanTable<TData>) => void
     enableExport?: boolean
     exportFilename?: string
+    // Expandable rows props
+    getRowId?: (row: TData, index: number) => string
+    renderExpandedContent?: (row: TData, rowId: string) => React.ReactNode
+    expandedRows?: Set<string>
+    onRowExpand?: (rowId: string, isExpanded: boolean) => void
+    enableRowExpansion?: boolean
+    children?: React.ReactNode
 }
 
 export function DataTable<TData, TValue>({
@@ -70,6 +77,7 @@ export function DataTable<TData, TValue>({
     title,
     description,
     actions,
+    children,
     state,
     onStateChange,
     pageSize = 10,
@@ -81,6 +89,11 @@ export function DataTable<TData, TValue>({
     onTableReady,
     enableExport = false,
     exportFilename = "export.csv",
+    getRowId,
+    renderExpandedContent,
+    expandedRows: externalExpandedRows,
+    onRowExpand,
+    enableRowExpansion = false,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = React.useState<SortingState>(state?.sorting ?? [])
     const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(state?.columnFilters ?? [])
@@ -90,10 +103,36 @@ export function DataTable<TData, TValue>({
     const [pagination, setPagination] = React.useState<PaginationState>(
         state?.pagination ?? { pageIndex: 0, pageSize }
     )
-
+    
+    // Internal expanded rows state (used if external state is not provided)
+    const [internalExpandedRows, setInternalExpandedRows] = React.useState<Set<string>>(new Set())
+    const expandedRows = externalExpandedRows ?? internalExpandedRows
+    
+    // Toggle row expansion
+    const toggleRow = React.useCallback((rowId: string) => {
+        const isExpanded = expandedRows.has(rowId)
+        if (externalExpandedRows === undefined) {
+            setInternalExpandedRows((prev) => {
+                const newSet = new Set(prev)
+                if (isExpanded) {
+                    newSet.delete(rowId)
+                } else {
+                    newSet.add(rowId)
+                }
+                return newSet
+            })
+        }
+        onRowExpand?.(rowId, !isExpanded)
+    }, [expandedRows, externalExpandedRows, onRowExpand])
+    
     const table = useReactTable({
         data,
         columns,
+        getRowId: getRowId ? (row: any, index: number) => {
+            // row is a Row object from TanStack Table, pass it directly to getRowId
+            // The getRowId function should handle extracting row.original if needed
+            return getRowId(row, index)
+        } : undefined,
         getCoreRowModel: getCoreRowModel(),
         getPaginationRowModel: manualPagination ? undefined : getPaginationRowModel(),
         getSortedRowModel: getSortedRowModel(),
@@ -255,13 +294,34 @@ export function DataTable<TData, TValue>({
                             </TableHeader>
                             <TableBody>
                                 {table.getRowModel().rows?.length ? (
-                                    table.getRowModel().rows.map((row) => (
-                                        <TableRow key={row.id} data-state={row.getIsSelected() && "selected"}>
-                                            {row.getVisibleCells().map((cell) => (
-                                                <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
-                                            ))}
-                                        </TableRow>
-                                    ))
+                                    table.getRowModel().rows.map((row) => {
+                                        // Use row.id which is set by TanStack Table when getRowId is provided
+                                        const rowId = row.id
+                                        const isExpanded = enableRowExpansion && expandedRows.has(rowId)
+                                        return (
+                                            <React.Fragment key={row.id}>
+                                                <TableRow 
+                                                    key={row.id} 
+                                                    data-state={row.getIsSelected() && "selected"}
+                                                    className={enableRowExpansion ? "cursor-pointer hover:bg-muted/50" : ""}
+                                                    onClick={enableRowExpansion ? () => toggleRow(rowId) : undefined}
+                                                >
+                                                    {row.getVisibleCells().map((cell) => (
+                                                        <TableCell key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</TableCell>
+                                                    ))}
+                                                </TableRow>
+                                                {isExpanded && renderExpandedContent && (
+                                                    <TableRow key={`${row.id}-expanded`}>
+                                                        <TableCell colSpan={columns.length} className="p-0 bg-muted/30">
+                                                            <div className="p-4">
+                                                                {renderExpandedContent(row.original, rowId)}
+                                                            </div>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                )}
+                                            </React.Fragment>
+                                        )
+                                    })
                                 ) : (
                                     <TableRow>
                                         <TableCell colSpan={columns.length} className="h-24 text-center">
@@ -317,7 +377,11 @@ export function DataTable<TData, TValue>({
                     )}
                 </div>
 
-
+                {children && (
+                    <div className="border-t">
+                        {children}
+                    </div>
+                )}
             </div>
         </Card>
     )

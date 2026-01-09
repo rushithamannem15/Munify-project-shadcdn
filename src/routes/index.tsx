@@ -2,6 +2,7 @@ import { createBrowserRouter } from "react-router-dom";
 import AppLayout from "@/layouts/AppLayout";
 import {
   Dashboard,
+  LenderDashboard,
   Projects,
   ProjectsActive,
   ProjectsLive,
@@ -49,6 +50,12 @@ import {
   CommonMasterExcel,
   FeeCategoryExemptionsManagement,
   MunicipalityDashboard,
+  LenderReport,
+  ProjectLevelCommitmentReport,
+  ProjectSuccessReport,
+  CurrentStatusReport,
+  ProjectLevelCommitmentReportAdmin,
+  ProjectSuccessReportAdmin,
 } from "@/pages";
 
 export const router = createBrowserRouter([
@@ -74,6 +81,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <Dashboard /> },
       { path: "dashboard/municipality", element: <MunicipalityDashboard /> },
+      { path: "lender/dashboard", element: <LenderDashboard /> },
       { path: "projects", element: <Projects /> },
       { path: "projects/live", element: <ProjectsLive /> },
       { path: "projects/funded", element: <ProjectsFunded /> },
@@ -122,6 +130,12 @@ export const router = createBrowserRouter([
       { path: "master/organizations", element: <OrganizationsManagement /> },
       { path: "master/common-excel", element: <CommonMasterExcel /> },
       { path: "master/fee-category-exemptions", element: <FeeCategoryExemptionsManagement /> },
+      { path: "reports/lender-report", element: <LenderReport /> },
+      { path: "reports/project-level-commitment", element: <ProjectLevelCommitmentReport /> },
+      { path: "reports/project-success", element: <ProjectSuccessReport /> },
+      { path: "reports/current-status", element: <CurrentStatusReport /> },
+      { path: "reports/project-level-commitment-admin", element: <ProjectLevelCommitmentReportAdmin /> },
+      { path: "reports/project-success-admin", element: <ProjectSuccessReportAdmin /> },
       { path: "*", element: <NotFound /> },
     ],
   },

@@ -12,22 +12,15 @@ import apiService from '@/services/api'
 import { alerts } from '@/lib/alerts'
 import { api } from '@/services/api'
 
-// Master table names
-const MASTER_TABLES = [
-  { value: 'funding_type_master', label: 'Funding Type Master' },
-  { value: 'mode_of_implementation_master', label: 'Mode of Implementation Master' },
-  { value: 'ownership_master', label: 'Ownership Master' },
-  { value: 'project_category_master', label: 'Project Category Master' },
-  { value: 'project_stage_master', label: 'Project Stage Master' },
-]
+interface MasterTableListItem {
+  id: number
+  table_name: string
+}
 
-// Excel file mapping for download (files in public folder)
-const EXCEL_FILE_MAP: Record<string, string> = {
-  funding_type_master: '/funding_type.xlsx',
-  mode_of_implementation_master: '/mode_of_implementation.xlsx',
-  ownership_master: '/ownership.xlsx',
-  project_category_master: '/project_category.xlsx',
-  project_stage_master: '/project_stage.xlsx',
+// Helper function to get Excel file path dynamically
+// Files are stored in src/assets/common_master_excels/{table_name}.xlsx
+const getExcelFilePath = (tableName: string): string => {
+  return `/src/assets/common_master_excels/${tableName}.xlsx`
 }
 
 // Helper function to format table name for display
@@ -43,6 +36,30 @@ export default function CommonMasterExcel() {
   const queryClient = useQueryClient()
   const [selectedTable, setSelectedTable] = useState<string>('')
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+
+  // Query for fetching master table list
+  const { 
+    data: masterTablesResponse, 
+    isLoading: isLoadingMasterTables, 
+    error: masterTablesError, 
+    isError: isMasterTablesError 
+  } = useQuery({
+    queryKey: ['master-tables-list'],
+    queryFn: () => apiService.get<MasterTableListItem[] | { data: MasterTableListItem[] }>('/master-table-list/'),
+  })
+
+  // Extract master tables array from response (handle both array and wrapped responses)
+  const masterTablesArray = Array.isArray(masterTablesResponse) 
+    ? masterTablesResponse 
+    : (masterTablesResponse as any)?.data || []
+
+  // Transform master tables data for Select component
+  const masterTables = Array.isArray(masterTablesArray)
+    ? masterTablesArray.map((table) => ({
+        value: table.table_name,
+        label: formatTableName(table.table_name),
+      }))
+    : []
 
   // Query for fetching table data
   const { data: tableDataResponse, isLoading, error, isError } = useQuery({
@@ -146,16 +163,15 @@ export default function CommonMasterExcel() {
       alerts.error('Validation Error', 'Please select a master table')
       return
     }
-    const filePath = EXCEL_FILE_MAP[selectedTable]
-    if (!filePath) {
-      alerts.error('Error', 'Excel file not found for this table')
-      return
-    }
+    
+    // Dynamically construct file path based on table name
+    // File naming convention: {table_name}.xlsx in public/assets/common_master_excels/
+    const filePath = getExcelFilePath(selectedTable)
     
     // Create a temporary anchor element to trigger download from public folder
     const link = document.createElement('a')
     link.href = filePath
-    link.download = `${selectedTable}_structure.xlsx`
+    link.download = `${selectedTable}.xlsx`
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -193,6 +209,16 @@ export default function CommonMasterExcel() {
         </p>
       </div>
 
+      {/* Error Alert for Master Tables List */}
+      {isMasterTablesError && (
+        <Alert variant="destructive">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            {masterTablesError?.message || 'Failed to fetch master tables list. Please try again.'}
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Controls Card */}
       <Card>
         <CardHeader>
@@ -205,18 +231,33 @@ export default function CommonMasterExcel() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="table-select">Master Table</Label>
-              <Select value={selectedTable} onValueChange={setSelectedTable}>
+              <Select 
+                value={selectedTable} 
+                onValueChange={setSelectedTable}
+                disabled={isLoadingMasterTables || isMasterTablesError}
+              >
                 <SelectTrigger id="table-select">
-                  <SelectValue placeholder="Select a master table" />
+                  <SelectValue placeholder={
+                    isLoadingMasterTables 
+                      ? "Loading master tables..." 
+                      : "Select a master table"
+                  } />
                 </SelectTrigger>
                 <SelectContent>
-                  {MASTER_TABLES.map((table) => (
-                    <SelectItem key={table.value} value={table.value}>
-                      {table.label}
-                    </SelectItem>
-                  ))}
+                  {masterTables.length === 0 && !isLoadingMasterTables ? (
+                    <SelectItem value="" disabled>No master tables available</SelectItem>
+                  ) : (
+                    masterTables.map((table) => (
+                      <SelectItem key={table.value} value={table.value}>
+                        {table.label}
+                      </SelectItem>
+                    ))
+                  )}
                 </SelectContent>
               </Select>
+              {isLoadingMasterTables && (
+                <p className="text-xs text-muted-foreground">Loading master tables...</p>
+              )}
             </div>
 
             <div className="space-y-2">
